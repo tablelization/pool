@@ -1,1 +1,79 @@
-# pool
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>全港泳池實時助手</title>
+    <style>
+        body { font-family: -apple-system, sans-serif; background: #f0f2f5; padding: 20px; }
+        h1 { text-align: center; color: #1a73e8; }
+        .pool-card {
+            background: white; border-radius: 12px; padding: 15px; margin-bottom: 15px;
+            display: flex; align-items: center; box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .status-dot { width: 15px; height: 15px; border-radius: 50%; margin-right: 15px; }
+        .open { background-color: #34a853; } /* 綠色 */
+        .cleaning { background-color: #ea4335; } /* 紅色 */
+        .info { flex-grow: 1; }
+        .pool-name { font-weight: bold; font-size: 1.1em; }
+        .pool-desc { color: #666; font-size: 0.9em; margin-top: 4px; }
+        .badge { background: #e8f0fe; color: #1967d2; padding: 2px 8px; border-radius: 4px; font-size: 0.8em; }
+    </style>
+</head>
+<body>
+
+    <h1>🏊 全港泳池狀態</h1>
+    <div id="datetime" style="text-align:center; margin-bottom:20px; color:#666;"></div>
+    <div id="pool-list">
+        </div>
+
+    <script>
+        // 1. 準備數據 (剛才我們校對過的)
+        const pools = [
+            { name: "九龍公園游泳池", cleaning_day: 2, warm: true, district: "油尖旺" },
+            { name: "維多利亞公園游泳池", cleaning_day: 1, warm: true, district: "東區" },
+            { name: "中山紀念公園游泳池", cleaning_day: 5, warm: true, district: "中西區" },
+            { name: "堅尼地城游泳池", cleaning_day: 3, warm: true, district: "中西區" },
+            { name: "觀塘游泳池", cleaning_day: 3, warm: true, district: "觀塘" }
+        ];
+
+        function updateDisplay() {
+            const now = new Date();
+            const today = now.getDay(); // 0是周日, 1是周一, 2是周二...
+            const hour = now.getHours();
+            
+            // 顯示當前時間
+            document.getElementById('datetime').innerText = `現在時間：${now.toLocaleString()}`;
+
+            const listDiv = document.getElementById('pool-list');
+            listDiv.innerHTML = ''; // 清空列表
+
+            pools.forEach(pool => {
+                // 邏輯判斷：是否正在大清潔 (10:00 - 18:00)
+                let isCleaning = (today === pool.cleaning_day && hour >= 10 && hour < 18);
+                
+                let statusClass = isCleaning ? 'cleaning' : 'open';
+                let statusText = isCleaning ? '🔴 正在每週大清潔 (暫停開放)' : '🟢 正常開放中';
+
+                // 生成 HTML 卡片
+                const card = `
+                    <div class="pool-card">
+                        <div class="status-dot ${statusClass}"></div>
+                        <div class="info">
+                            <div class="pool-name">${pool.name} <span class="badge">${pool.district}</span></div>
+                            <div class="pool-desc">${statusText}</div>
+                        </div>
+                        <div style="font-size: 0.8em; color: #999;">
+                            ${pool.warm ? '暖水♨️' : '常溫❄️'}
+                        </div>
+                    </div>
+                `;
+                listDiv.innerHTML += card;
+            });
+        }
+
+        // 初始化顯示
+        updateDisplay();
+    </script>
+</body>
+</html>
