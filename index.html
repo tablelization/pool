@@ -1,45 +1,137 @@
-const weekNames = ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"];
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>全港泳池實時助手 (Web版)</title>
+    <style>
+        :root {
+            --primary: #1a73e8;
+            --success: #34a853;
+            --danger: #ea4335;
+            --warning: #fbbc05;
+            --bg: #f8f9fa;
+        }
+        body { font-family: -apple-system, "Segoe UI", Roboto, sans-serif; background: var(--bg); padding: 15px; margin: 0; }
+        header { text-align: center; padding: 20px 0; background: white; margin-bottom: 20px; border-bottom: 1px solid #ddd; }
+        h1 { margin: 0; color: var(--primary); font-size: 1.5rem; }
+        .container { max-width: 600px; margin: 0 auto; }
+        
+        .pool-card {
+            background: white; border-radius: 12px; padding: 16px; margin-bottom: 12px;
+            display: flex; align-items: center; box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+            transition: transform 0.2s;
+        }
+        .pool-card:active { transform: scale(0.98); }
+        
+        .status-indicator { width: 12px; height: 12px; border-radius: 50%; margin-right: 15px; flex-shrink: 0; }
+        .open { background-color: var(--success); box-shadow: 0 0 8px var(--success); }
+        .cleaning { background-color: var(--danger); box-shadow: 0 0 8px var(--danger); }
+        
+        .info { flex-grow: 1; }
+        .pool-name { font-weight: 700; font-size: 1.1rem; color: #333; margin-bottom: 4px; }
+        .district-tag { background: #e8f0fe; color: var(--primary); padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; margin-left: 5px; vertical-align: middle; }
+        
+        .status-text { font-size: 0.9rem; margin-bottom: 4px; }
+        .next-clean { font-size: 0.8rem; color: #777; display: flex; align-items: center; }
+        .feature-icons { font-size: 0.8rem; color: #999; text-align: right; min-width: 50px; }
+
+        .update-time { font-size: 0.8rem; color: #999; text-align: center; margin-top: 20px; }
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>🏊 全港泳池查詢助手</h1>
+    <div id="live-clock" style="font-size: 0.9rem; color: #666; margin-top: 5px;"></div>
+</header>
+
+<div class="container" id="pool-list">
+    </div>
+
+<div class="update-time">
+    數據依據：康文署每週大清潔時間表 (10:00 - 18:00)<br>
+    ※ 若大清潔日為公眾假期，清潔工作將會順延。
+</div>
+
+<script>
+    // 1. 全港泳池數據清單
+    const pools = [
+        { name: "九龍公園游泳池", cleaning_day: 2, warm: true, district: "油尖旺" },
+        { name: "維多利亞公園游泳池", cleaning_day: 1, warm: true, district: "東區" },
+        { name: "中山紀念公園游泳池", cleaning_day: 5, warm: true, district: "中西區" },
+        { name: "堅尼地城游泳池", cleaning_day: 3, warm: true, district: "中西區" },
+        { name: "觀塘游泳池", cleaning_day: 3, warm: true, district: "觀塘" },
+        { name: "摩理臣山游泳池", cleaning_day: 1, warm: true, district: "灣仔" },
+        { name: "何文田游泳池", cleaning_day: 3, warm: true, district: "九龍城" },
+        { name: "沙田賽馬會游泳池", cleaning_day: 1, warm: true, district: "沙田" },
+        { name: "將軍澳游泳池", cleaning_day: 1, warm: true, district: "西貢" }
+    ];
+
+    const weekNames = ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"];
+
+    function renderPools() {
+        const now = new Date();
+        const today = now.getDay(); 
+        const hour = now.getHours();
+        
+        // 更新頂部時鐘
+        document.getElementById('live-clock').innerText = `系統時間：${now.toLocaleString('zh-HK', { hour12: false })}`;
+
+        const listContainer = document.getElementById('pool-list');
+        listContainer.innerHTML = '';
 
         pools.forEach(pool => {
-            const now = new Date();
-            const today = now.getDay(); 
-            const hour = now.getHours();
-
-            // 1. 判斷是否正在清潔 (10:00 - 18:00)
-            let isCleaning = (today === pool.cleaning_day && hour >= 10 && hour < 18);
+            // --- 邏輯 A: 判斷是否「正在洗池」 ---
+            let isCleaningTime = (today === pool.cleaning_day && hour >= 10 && hour < 18);
             
-            // 2. 計算下一次大清潔是哪一天
-            let nextCleaningText = "";
-            if (today === pool.cleaning_day) {
-                if (hour < 10) {
-                    nextCleaningText = "今天稍後 (10:00 開始)";
-                } else if (hour >= 18) {
-                    nextCleaningText = "下個 " + weekNames[pool.cleaning_day];
-                } else {
-                    nextCleaningText = "正進行中";
-                }
+            // --- 邏輯 B: 計算「下次清潔」的文字提示 ---
+            let nextCleanMsg = "";
+            let diff = pool.cleaning_day - today;
+
+            if (diff === 0) {
+                // 今天就是清潔日
+                if (hour < 10) nextCleanMsg = "今天稍後 (10:00 開始)";
+                else if (hour < 18) nextCleanMsg = "正進行中 (預計 18:00 重開)";
+                else nextCleanMsg = "下週" + weekNames[pool.cleaning_day];
+            } else if (diff === 1 || diff === -6) {
+                nextCleanMsg = "明天 (" + weekNames[pool.cleaning_day] + ")";
             } else {
-                nextCleaningText = "下個 " + weekNames[pool.cleaning_day];
+                nextCleanMsg = "下個" + weekNames[pool.cleaning_day];
             }
 
-            // 3. 生成樣式
-            let statusClass = isCleaning ? 'cleaning' : 'open';
-            let statusText = isCleaning ? '🔴 正在大清潔' : '🟢 正常開放';
-
-            const card = `
-                <div class="pool-card">
-                    <div class="status-dot ${statusClass}"></div>
-                    <div class="info">
-                        <div class="pool-name">${pool.name} <span class="badge">${pool.district}</span></div>
-                        <div class="pool-desc">
-                            狀態：${statusText}<br>
-                            <small style="color:#888;">📅 下次大清潔：${nextCleaningText}</small>
-                        </div>
+            // --- 邏輯 C: 生成 HTML 結構 ---
+            const card = document.createElement('div');
+            card.className = 'pool-card';
+            
+            card.innerHTML = `
+                <div class="status-indicator ${isCleaningTime ? 'cleaning' : 'open'}"></div>
+                <div class="info">
+                    <div class="pool-name">
+                        ${pool.name}<span class="district-tag">${pool.district}</span>
                     </div>
-                    <div style="font-size: 0.8em; color: #999;">
-                        ${pool.warm ? '暖水♨️' : '常溫❄️'}
+                    <div class="status-text" style="color: ${isCleaningTime ? 'var(--danger)' : 'var(--success)'}">
+                        ${isCleaningTime ? '<b>正在大清潔 (暫停開放)</b>' : '正常開放中'}
+                    </div>
+                    <div class="next-clean">
+                        <span>📅 下次大清潔：${nextCleanMsg}</span>
                     </div>
                 </div>
+                <div class="feature-icons">
+                    ${pool.warm ? '♨️暖水' : '❄️常溫'}<br>
+                    <span style="font-size:10px">10:00-18:00</span>
+                </div>
             `;
-            listDiv.innerHTML += card;
+            listContainer.appendChild(card);
         });
+    }
+
+    // 初次執行
+    renderPools();
+    
+    // 每分鐘自動刷新一次介面 (確保時間準確)
+    setInterval(renderPools, 60000);
+</script>
+
+</body>
+</html>
