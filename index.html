@@ -3,134 +3,186 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>全港泳池實時助手 Pro</title>
+    <title>全港泳池實時助手 Pro Max</title>
     <style>
-        :root {
-            --primary: #1a73e8; --success: #34a853; --danger: #ea4335; --warning: #fbbc05; --bg: #f8f9fa;
-        }
-        body { font-family: -apple-system, sans-serif; background: var(--bg); padding: 0; margin: 0; }
-        header { text-align: center; padding: 20px; background: white; border-bottom: 1px solid #ddd; position: sticky; top: 0; z-index: 100; }
-        h1 { margin: 0; color: var(--primary); font-size: 1.3rem; }
-        
-        /* 分區切換按鈕 */
-        .filter-bar { display: flex; justify-content: center; gap: 10px; padding: 10px; background: #fff; margin-bottom: 15px; }
-        .filter-btn { border: none; background: #eee; padding: 6px 15px; border-radius: 20px; cursor: pointer; font-size: 0.9rem; }
+        :root { --primary: #1a73e8; --success: #34a853; --danger: #ea4335; --warning: #fbbc05; --bg: #f8f9fa; }
+        body { font-family: -apple-system, sans-serif; background: var(--bg); padding: 0; margin: 0; padding-bottom: 50px; }
+        .sticky-header { position: sticky; top: 0; z-index: 100; background: white; border-bottom: 1px solid #ddd; }
+        header { text-align: center; padding: 15px; }
+        h1 { margin: 0; color: var(--primary); font-size: 1.2rem; }
+        .search-container { padding: 0 15px 10px; }
+        #search-input { width: 100%; padding: 10px 15px; border-radius: 25px; border: 1px solid #ddd; font-size: 0.95rem; box-sizing: border-box; outline: none; }
+        .filter-bar { display: flex; justify-content: center; gap: 5px; padding-bottom: 10px; flex-wrap: wrap; }
+        .filter-btn { border: none; background: #eee; padding: 5px 10px; border-radius: 15px; cursor: pointer; font-size: 0.8rem; }
         .filter-btn.active { background: var(--primary); color: white; }
-
-        .container { max-width: 600px; margin: 0 auto; padding: 0 15px; }
-        
-        .pool-card {
-            background: white; border-radius: 12px; padding: 16px; margin-bottom: 12px;
-            display: flex; align-items: center; box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-        }
-        
-        /* 狀態顏色 */
+        .container { max-width: 600px; margin: 0 auto; padding: 15px; }
+        .pool-card { background: white; border-radius: 12px; padding: 16px; margin-bottom: 12px; display: flex; align-items: center; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
         .status-indicator { width: 12px; height: 12px; border-radius: 50%; margin-right: 15px; flex-shrink: 0; }
         .open { background-color: var(--success); }
         .cleaning { background-color: var(--danger); }
-        .winter-closed { background-color: #999; } /* 冬季關閉用灰色 */
-        
+        .break { background-color: var(--warning); }
+        .winter-closed { background-color: #999; }
         .info { flex-grow: 1; }
-        .pool-name { font-weight: 700; color: #333; }
+        .pool-name { font-weight: 700; color: #333; margin-bottom: 2px; }
         .district-tag { background: #f0f0f0; color: #666; padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; margin-left: 5px; }
-        .status-text { font-size: 0.85rem; margin-top: 4px; }
-        .next-clean { font-size: 0.75rem; color: #888; margin-top: 4px; }
-        
-        .feature-icons { text-align: right; font-size: 0.75rem; color: #999; min-width: 60px; }
+        .status-text { font-size: 0.85rem; margin-top: 4px; font-weight: 600; }
+        .session-list { font-size: 0.7rem; color: #999; margin-top: 6px; display: flex; flex-wrap: wrap; gap: 4px; }
+        .session-item { background: #f8f9fa; padding: 2px 5px; border-radius: 3px; border: 1px solid #eee; }
+        .session-item.active { background: #e8f0fe; color: var(--primary); border-color: var(--primary); font-weight: bold; }
+        .feature-icons { text-align: right; font-size: 0.7rem; color: #bbb; min-width: 70px; }
     </style>
 </head>
 <body>
 
-<header>
-    <h1>🏊 全港泳池實時助手</h1>
-    <div id="live-clock" style="font-size: 0.8rem; color: #888; margin-top: 5px;"></div>
-</header>
-
-<div class="filter-bar">
-    <button class="filter-btn active" onclick="filterPools('ALL')">全部</button>
-    <button class="filter-btn" onclick="filterPools('HK')">港島</button>
-    <button class="filter-btn" onclick="filterPools('KLN')">九龍</button>
-    <button class="filter-btn" onclick="filterPools('NT')">新界</button>
+<div class="sticky-header">
+    <header><h1>🏊 全港泳池實時助手</h1></header>
+    <div class="search-container"><input type="text" id="search-input" placeholder="搜尋泳池名稱或地區..." oninput="handleSearch()"></div>
+    <div class="filter-bar">
+        <button class="filter-btn active" onclick="setFilter('ALL')">全部</button>
+        <button class="filter-btn" onclick="setFilter('HK')">港島</button>
+        <button class="filter-btn" onclick="setFilter('KLN')">九龍</button>
+        <button class="filter-btn" onclick="setFilter('NT')">新界</button>
+        <button class="filter-btn" onclick="setFilter('IS')">離島</button>
+    </div>
 </div>
 
 <div class="container" id="pool-list"></div>
 
 <script>
+    // 標準開放時間定義
+    const stdSess = [{s:"06:30",e:"12:00"},{s:"13:00",e:"17:00"},{s:"18:00",e:"22:00"}];
+    const wcSess = [{s:"07:00",e:"12:00"},{s:"13:00",e:"17:00"},{s:"18:00",e:"22:00"}]; // 灣仔及個別池
+
     const pools = [
-        { name: "九龍公園游泳池", cleaning_day: 2, warm: true, region: "KLN", district: "油尖旺" },
-        { name: "維多利亞公園游泳池", cleaning_day: 1, warm: true, region: "HK", district: "東區" },
-        { name: "中山紀念公園游泳池", cleaning_day: 5, warm: true, region: "HK", district: "中西區" },
-        { name: "堅尼地城游泳池", cleaning_day: 3, warm: true, region: "HK", district: "中西區" },
-        { name: "觀塘游泳池", cleaning_day: 3, warm: true, region: "KLN", district: "觀塘" },
-        { name: "柴灣游泳池", cleaning_day: 2, warm: false, region: "HK", district: "東區" },
-        { name: "沙田賽馬會游泳池", cleaning_day: 1, warm: true, region: "NT", district: "沙田" },
-        { name: "荔枝角游泳池", cleaning_day: 3, warm: true, region: "KLN", district: "深水埗" },
-        { name: "大埔游泳池", cleaning_day: 5, warm: false, region: "NT", district: "大埔" }
+        // 香港島
+        { name: "中山紀念公園游泳池", cleaning_day: 5, warm: true, region: "HK", district: "中西區", sessions: stdSess },
+        { name: "堅尼地城游泳池", cleaning_day: 3, warm: true, region: "HK", district: "中西區", sessions: stdSess },
+        { name: "摩理臣山游泳池", cleaning_day: 1, warm: true, region: "HK", district: "灣仔", sessions: stdSess },
+        { name: "灣仔游泳池", cleaning_day: 2, warm: true, region: "HK", district: "灣仔", sessions: wcSess },
+        { name: "維多利亞公園游泳池", cleaning_day: 1, warm: true, region: "HK", district: "東區", sessions: stdSess },
+        { name: "柴灣游泳池", cleaning_day: 2, warm: false, region: "HK", district: "東區", sessions: stdSess },
+        { name: "港島東游泳池", cleaning_day: 3, warm: true, region: "HK", district: "東區", sessions: stdSess },
+        { name: "包玉剛游泳池", cleaning_day: 4, warm: false, region: "HK", district: "南區", sessions: stdSess },
+        
+        // 九龍
+        { name: "九龍公園游泳池", cleaning_day: 2, warm: true, region: "KLN", district: "油尖旺", sessions: stdSess },
+        { name: "大角咀游泳池", cleaning_day: 1, warm: true, region: "KLN", district: "油尖旺", sessions: stdSess },
+        { name: "何文田游泳池", cleaning_day: 3, warm: true, region: "KLN", district: "九龍城", sessions: stdSess },
+        { name: "九龍仔游泳池", cleaning_day: 1, warm: false, region: "KLN", district: "九龍城", sessions: stdSess },
+        { name: "摩士公園游泳池", cleaning_day: 5, warm: true, region: "KLN", district: "黃大仙", sessions: stdSess },
+        { name: "斧山道游泳池", cleaning_day: 1, warm: true, region: "KLN", district: "黃大仙", sessions: stdSess },
+        { name: "觀塘游泳池", cleaning_day: 3, warm: true, region: "KLN", district: "觀塘", sessions: stdSess },
+        { name: "藍田游泳池", cleaning_day: 4, warm: true, region: "KLN", district: "觀塘", sessions: stdSess },
+        { name: "深水埗游泳池", cleaning_day: 5, warm: true, region: "KLN", district: "深水埗", sessions: stdSess },
+        { name: "荔枝角公園游泳池", cleaning_day: 3, warm: true, region: "KLN", district: "深水埗", sessions: stdSess },
+
+        // 新界
+        { name: "沙田賽馬會游泳池", cleaning_day: 1, warm: true, region: "NT", district: "沙田", sessions: stdSess },
+        { name: "顯田游泳池", cleaning_day: 4, warm: true, region: "NT", district: "沙田", sessions: stdSess },
+        { name: "馬鞍山游泳池", cleaning_day: 2, warm: false, region: "NT", district: "沙田", sessions: stdSess },
+        { name: "大埔游泳池", cleaning_day: 5, warm: false, region: "NT", district: "大埔", sessions: stdSess },
+        { name: "粉嶺游泳池", cleaning_day: 2, warm: true, region: "NT", district: "北區", sessions: stdSess },
+        { name: "上水游泳池", cleaning_day: 4, warm: false, region: "NT", district: "北區", sessions: stdSess },
+        { name: "將軍澳游泳池", cleaning_day: 1, warm: true, region: "NT", district: "西貢", sessions: stdSess },
+        { name: "西貢游泳池", cleaning_day: 3, warm: false, region: "NT", district: "西貢", sessions: stdSess },
+        { name: "荃灣游泳池", cleaning_day: 2, warm: false, region: "NT", district: "荃灣", sessions: stdSess },
+        { name: "城門谷游泳池", cleaning_day: 1, warm: true, region: "NT", district: "荃灣", sessions: stdSess },
+        { name: "葵盛游泳池", cleaning_day: 5, warm: false, region: "NT", district: "葵青", sessions: stdSess },
+        { name: "北葵涌游泳池", cleaning_day: 3, warm: false, region: "NT", district: "葵青", sessions: stdSess },
+        { name: "青衣游泳池", cleaning_day: 4, warm: false, region: "NT", district: "葵青", sessions: stdSess },
+        { name: "青衣西南游泳池", cleaning_day: 2, warm: true, region: "NT", district: "葵青", sessions: stdSess },
+        { name: "屯門游泳池", cleaning_day: 4, warm: true, region: "NT", district: "屯門", sessions: stdSess },
+        { name: "賽馬會仁愛堂游泳池", cleaning_day: 2, warm: false, region: "NT", district: "屯門", sessions: stdSess },
+        { name: "屯門西北游泳池", cleaning_day: 3, warm: true, region: "NT", district: "屯門", sessions: stdSess },
+        { name: "元朗游泳池", cleaning_day: 3, warm: true, region: "NT", district: "元朗", sessions: stdSess },
+        { name: "天水圍游泳池", cleaning_day: 4, warm: false, region: "NT", district: "元朗", sessions: stdSess },
+        { name: "屏山天水圍游泳池", cleaning_day: 1, warm: true, region: "NT", district: "元朗", sessions: stdSess },
+        { name: "東涌游泳池", cleaning_day: 2, warm: true, region: "IS", district: "離島", sessions: stdSess },
+        { name: "梅窩游泳池", cleaning_day: 5, warm: false, region: "IS", district: "離島", sessions: stdSess }
+        // ... 其他較小型或特定用途池（如鳳琴街、九龍仔等已包含在內）
     ];
 
-    let currentFilter = 'ALL';
+    let currentRegion = 'ALL';
+    let searchQuery = '';
 
-    function filterPools(region) {
-        currentFilter = region;
-        // 更新按鈕樣式
+    function handleSearch() {
+        searchQuery = document.getElementById('search-input').value.toLowerCase();
+        renderPools();
+    }
+
+    function setFilter(region) {
+        currentRegion = region;
         document.querySelectorAll('.filter-btn').forEach(btn => {
-            btn.classList.toggle('active', btn.innerText === (region === 'ALL' ? '全部' : (region==='HK'?'港島':region==='KLN'?'九龍':'新界')));
+            btn.classList.toggle('active', btn.getAttribute('onclick').includes(`'${region}'`));
         });
         renderPools();
     }
 
     function renderPools() {
         const now = new Date();
-        const month = now.getMonth() + 1; // 0-11 改為 1-12
+        const currentTime = now.getHours().toString().padStart(2,'0') + ":" + now.getMinutes().toString().padStart(2,'0');
         const today = now.getDay();
-        const hour = now.getHours();
-        
-        // 判斷是否為冬季 (11月至隔年3月)
+        const month = now.getMonth() + 1;
         const isWinter = (month >= 11 || month <= 3);
 
-        document.getElementById('live-clock').innerText = `更新時間：${now.toLocaleString()}`;
         const listContainer = document.getElementById('pool-list');
         listContainer.innerHTML = '';
 
-        pools.filter(p => currentFilter === 'ALL' || p.region === currentFilter).forEach(pool => {
-            
-            let status = "open";
-            let statusText = "🟢 正常開放中";
-            let nextCleanMsg = `下個星期${['日','一','二','三','四','五','六'][pool.cleaning_day]}`;
+        const filtered = pools.filter(p => {
+            const matchRegion = currentRegion === 'ALL' || p.region === currentRegion;
+            const matchSearch = p.name.toLowerCase().includes(searchQuery) || p.district.toLowerCase().includes(searchQuery);
+            return matchRegion && matchSearch;
+        });
 
-            // 1. 判斷冬季關閉 (非暖水池 & 冬季)
+        filtered.forEach(pool => {
+            let status = "open";
+            let statusText = "🟢 開放中";
+            let activeSessionIdx = -1;
+
             if (isWinter && !pool.warm) {
                 status = "winter-closed";
-                statusText = "❄️ 冬季關閉 (非暖水池)";
-                nextCleanMsg = "預計 4 月重開";
-            } 
-            // 2. 判斷大清潔 (10:00 - 18:00)
-            else if (today === pool.cleaning_day && hour >= 10 && hour < 18) {
+                statusText = "❄️ 冬季關閉";
+            } else if (today === pool.cleaning_day && now.getHours() >= 10 && now.getHours() < 18) {
                 status = "cleaning";
-                statusText = "🔴 正在大清潔 (暫停開放)";
-                nextCleanMsg = "預計今日 18:00 重開";
+                statusText = "🔴 大清潔中 (18:00重開)";
+            } else {
+                activeSessionIdx = pool.sessions.findIndex(s => currentTime >= s.s && currentTime <= s.e);
+                if (activeSessionIdx !== -1) {
+                    statusText = `🟢 開放中 (至 ${pool.sessions[activeSessionIdx].e})`;
+                } else {
+                    status = "break";
+                    let next = pool.sessions.find(s => s.s > currentTime);
+                    statusText = next ? `🟡 休息中 (${next.s} 重開)` : "🟡 今日已完結";
+                }
             }
 
-            const card = `
+            const sessionsHtml = pool.sessions.map((s, idx) => 
+                `<span class="session-item ${idx === activeSessionIdx ? 'active' : ''}">${s.s}-${s.e}</span>`
+            ).join('');
+
+            listContainer.innerHTML += `
                 <div class="pool-card">
                     <div class="status-indicator ${status}"></div>
                     <div class="info">
                         <div class="pool-name">${pool.name}<span class="district-tag">${pool.district}</span></div>
-                        <div class="status-text">${statusText}</div>
-                        <div class="next-clean">📅 ${nextCleanMsg}</div>
+                        <div class="status-text" style="color:${status==='open'?'var(--success)':status==='cleaning'?'var(--danger)':'#888'}">${statusText}</div>
+                        <div class="session-list">${sessionsHtml}</div>
                     </div>
                     <div class="feature-icons">
-                        ${pool.warm ? '♨️ 暖水' : '常溫'}<br>
-                        <span style="font-size:10px">06:30-22:00</span>
+                        ${pool.warm ? '♨️暖水' : '❄️常溫'}<br>
+                        <span style="font-size:10px">洗池: 週${['日','一','二','三','四','五','六'][pool.cleaning_day]}</span>
                     </div>
                 </div>
             `;
-            listContainer.innerHTML += card;
         });
+        
+        if (filtered.length === 0) {
+            listContainer.innerHTML = '<p style="text-align:center; color:#999; margin-top:50px;">找不到相關泳池</p>';
+        }
     }
 
     renderPools();
-    setInterval(renderPools, 60000);
+    setInterval(renderPools, 30000);
 </script>
 </body>
 </html>
